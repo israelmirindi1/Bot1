@@ -1,86 +1,63 @@
 import os
 import time
-import hmac
-import hashlib
 import requests
-from urllib.parse import urlencode
 
-# Lecture sécurisée des clés via Render
-API_KEY = os.environ.get("API_KEY")
-SECRET_KEY = os.environ.get("SECRET_KEY")
-BASE_URL = "https://api.binance.com"
+# Clés d'API Binance
+API_KEY = os.getenv("API_KEY")
+SECRET_KEY = os.getenv("SECRET_KEY")
 
-AD_ID = "VOTRE_ID_ANNONCE_P2P"    # Remplacez par votre ID d'annonce
-ASSET = "USDT"                     
-FIAT = "CDF"                       
-TRADE_TYPE = "SELL"                
+# Configuration de la stratégie
+FLOOR_PRICE = 2310.0  # Prix plancher minimum (en CDF)
+PRICE_STEP = 1.0      # Écart à soustraire (-1 CDF)
 
-PRICE_STEP = 1.0                   # -1 CDF
-MIN_PRICE_LIMIT = 2200.0           # Prix plancher de sécurité
-
-def get_signature(query_string):
-    return hmac.new(
-        SECRET_KEY.encode('utf-8'),
-        query_string.encode('utf-8'),
-        hashlib.sha256
-    ).hexdigest()
-
-def get_lowest_market_price():
+def get_lowest_sell_price():
     url = "https://p2p.binance.com/bapi/c2c/v2/friendly/c2c/adv/search"
-    headers = {"Content-Type": "application/json"}
     payload = {
-        "asset": ASSET,
-        "fiat": FIAT,
-        "tradeType": TRADE_TYPE,
+        "asset": "USDT",
+        "fiat": "CDF",
+        "merchantCheck": False,
         "page": 1,
         "rows": 10,
-        "payTypes": []
+        "tradeType": "SELL"
     }
-    response = requests.post(url, json=payload, headers=headers)
-    data = response.json()
     
-    if data.get("data"):
-        for item in data["data"]:
-            adv = item["adv"]
-            if adv["advNo"] != AD_ID:
-                return float(adv["price"])
+    try:
+        response = requests.post(url, json=payload, timeout=10)
+        data = response.json()
+        ads = data.get("data", [])
+        
+        if ads:
+            # Récupère le prix le plus bas actuellement sur le marché
+            return float(ads[0]["adv"]["price"])
+    except Exception as e:
+        print(f"Erreur lors de la récupération des prix: {e}")
     return None
 
-def update_ad_price(new_price):
-    endpoint = "/sapi/v1/c2c/ads/update"
-    timestamp = int(time.time() * 1000)
+def calculate_target_price(market_min):
+    # Calcul du prix ajusté (-1 CDF)
+    ideal_price = market_min - PRICE_STEP
     
-    params = {
-        "advNo": AD_ID,
-        "price": str(new_price),
-        "timestamp": timestamp
-    }
+    # Sécurité : Appliquer la limite minimale de 2310 CDF
+    if ideal_price < FLOOR_PRICE:
+        print(f"Prix calculé ({ideal_price} CDF) sous la limite ! Blocage au plancher de {FLOOR_PRICE} CDF.")
+        return FLOOR_PRICE
     
-    query_string = urlencode(params)
-    signature = get_signature(query_string)
-    
-    url = f"{BASE_URL}{endpoint}?{query_string}&signature={signature}"
-    headers = {"X-MBXAPIKEY": API_KEY}
-    
-    response = requests.post(url, headers=headers)
-    return response.json()
+    return ideal_price
 
-def run_bot():
-    print(f"Bot P2P démarré [{ASSET}/{FIAT}]")
-    while True:
-        try:
-            lowest_price = get_lowest_market_price()
-            if lowest_price:
-                target_price = lowest_price - PRICE_STEP
-                if target_price < MIN_PRICE_LIMIT:
-                    target_price = MIN_PRICE_LIMIT
-                
-                print(f"Prix marché: {lowest_price} CDF | Nouveau prix: {target_price} CDF")
-                result = update_ad_price(target_price)
-                print("Statut:", result)
-        except Exception as e:
-            print(f"Erreur: {e}")
-        time.sleep(15)
+def main():
+    print("--- Bot P2P Binance Démarré ---")
+    print(f"Limite minimale configurée : {FLOOR_PRICE} CDF\n")
+    
+    market_min = get_lowest_sell_price()
+    
+    if market_min:
+        target_price = calculate_target_price(market_min)
+        print(f"Prix concurrent le plus bas : {market_min} CDF")
+        print(f"Nouveau prix pour votre annonce : {target_price} CDF")
+        
+        # Ici : Ajouter la fonction de mise à jour de l'annonce via l'API Binance
+    else:
+        print("Impossible d'obtenir le prix du marché.")
 
 if __name__ == "__main__":
-    run_bot()
+    main()
