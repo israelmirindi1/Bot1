@@ -2,9 +2,9 @@ import os
 import time
 import requests
 
-# Clés d'API Binance
-API_KEY = os.getenv("akIYsqqUKHMMvL9EIgFIfQdxE0ZHkrVThIrFjgfBlqAcYyAuUhwXnu202ipj8AOE")
-SECRET_KEY = os.getenv("BuVnrnwCp5IERa7Yobrotr09NOfvz2z0JWKDWRJBsDE31GhV28aKbRSFwUpl1sL0")
+# Clés d'API Binance (récupérées depuis les variables du serveur)
+API_KEY = os.getenv("API_KEY")
+SECRET_KEY = os.getenv("SECRET_KEY")
 
 # Configuration de la stratégie
 FLOOR_PRICE = 2310.0  # Prix plancher minimum (en CDF)
@@ -34,10 +34,9 @@ def get_lowest_sell_price():
     return None
 
 def calculate_target_price(market_min):
-    # Calcul du prix ajusté (-1 CDF)
     ideal_price = market_min - PRICE_STEP
     
-    # Sécurité : Appliquer la limite minimale de 2310 CDF
+    # Sécurité : Limite minimale de 2310 CDF
     if ideal_price < FLOOR_PRICE:
         print(f"Prix calculé ({ideal_price} CDF) sous la limite ! Blocage au plancher de {FLOOR_PRICE} CDF.")
         return FLOOR_PRICE
@@ -45,17 +44,15 @@ def calculate_target_price(market_min):
     return ideal_price
 
 def main():
-    print("--- Bot P2P Binance Démarré ---")
+    print("--- Test du Bot P2P Binance ---")
     print(f"Limite minimale configurée : {FLOOR_PRICE} CDF\n")
     
     market_min = get_lowest_sell_price()
     
     if market_min:
         target_price = calculate_target_price(market_min)
-        print(f"Prix concurrent le plus bas : {market_min} CDF")
-        print(f"Nouveau prix pour votre annonce : {target_price} CDF")
-        
-        # Ici : Ajouter la fonction de mise à jour de l'annonce via l'API Binance
+        print(f"Meilleur prix concurrent actuel : {market_min} CDF")
+        print(f"Prix cible calculé pour votre annonce : {target_price} CDF")
     else:
         print("Impossible d'obtenir le prix du marché.")
 
