@@ -3,8 +3,8 @@ import time
 import requests
 
 # Clés d'API Binance
-API_KEY = os.getenv("API_KEY")
-SECRET_KEY = os.getenv("SECRET_KEY")
+API_KEY = os.getenv("akIYsqqUKHMMvL9EIgFIfQdxE0ZHkrVThIrFjgfBlqAcYyAuUhwXnu202ipj8AOE")
+SECRET_KEY = os.getenv("BuVnrnwCp5IERa7Yobrotr09NOfvz2z0JWKDWRJBsDE31GhV28aKbRSFwUpl1sL0")
 
 # Configuration de la stratégie
 FLOOR_PRICE = 2310.0  # Prix plancher minimum (en CDF)
