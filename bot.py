@@ -4,15 +4,15 @@ import hmac
 import hashlib
 import requests
 
-# Récupération des clés depuis les variables définies dans Termius
+# Variables d'environnement
 API_KEY = os.getenv("API_KEY")
 SECRET_KEY = os.getenv("SECRET_KEY")
 ADV_NO = os.getenv("ADV_NO")
 
-FLOOR_PRICE = 2310.0  # Prix plancher minimum (CDF)
-PRICE_STEP = 1.0      # Écart à soustraire (-1 CDF)
+FLOOR_PRICE = 2310.0  # Limite minimale (CDF)
+PRICE_STEP = 1.0      # Écart de -1 CDF pour passer devant
 
-def get_lowest_sell_price():
+def get_lowest_p2p_price():
     url = "https://p2p.binance.com/bapi/c2c/v2/friendly/c2c/adv/search"
     payload = {
         "asset": "USDT",
@@ -20,12 +20,13 @@ def get_lowest_sell_price():
         "merchantCheck": False,
         "page": 1,
         "rows": 10,
-        "tradeType": "SELL"
+        "tradeType": "BUY"  # Filtre exact pour la liste de l'onglet "Buy"
     }
     try:
         res = requests.post(url, json=payload, timeout=10).json()
         ads = res.get("data", [])
         if ads:
+            # Récupère le prix du tout premier vendeur (ex: 2327.8 CDF sur la photo)
             return float(ads[0]["adv"]["price"])
     except Exception as e:
         print(f"Erreur lecture marché : {e}")
@@ -33,48 +34,44 @@ def get_lowest_sell_price():
 
 def update_ad_price(new_price):
     if not API_KEY or not SECRET_KEY or not ADV_NO:
-        print("Erreur : Clés API ou ADV_NO manquants dans l'environnement !")
+        print("Erreur : API_KEY, SECRET_KEY ou ADV_NO manquants dans Termius.")
         return
 
     url = "https://api.binance.com/sapi/v1/c2c/ads/update"
     timestamp = int(time.time() * 1000)
     
-    # Paramètres de la requête de mise à jour Binance
     params = {
         "advNo": ADV_NO,
         "price": str(new_price),
         "timestamp": timestamp
     }
     
-    # Création de la signature HMAC-SHA256
+    # Signature de la requête
     query_string = '&'.join([f"{k}={v}" for k, v in sorted(params.items())])
     signature = hmac.new(SECRET_KEY.encode('utf-8'), query_string.encode('utf-8'), hashlib.sha256).hexdigest()
     params["signature"] = signature
 
-    headers = {
-        "X-MBX-APIKEY": API_KEY
-    }
+    headers = {"X-MBX-APIKEY": API_KEY}
 
     try:
         response = requests.post(url, headers=headers, params=params)
-        print(f"Statut mise à jour : {response.status_code}")
         print(f"Réponse Binance : {response.text}")
     except Exception as e:
-        print(f"Erreur envoi modification : {e}")
+        print(f"Erreur lors de la mise à jour : {e}")
 
 def main():
-    print("--- Démarrage du Bot P2P Binance ---")
-    market_min = get_lowest_sell_price()
+    print("--- Bot P2P Binance (Onglet Buy) ---")
+    market_min = get_lowest_p2p_price()
     
     if market_min:
+        # Calcule le prix pour passer juste au-dessus/en-dessous (ex: 2327.8 - 1 = 2326.8)
         target_price = max(market_min - PRICE_STEP, FLOOR_PRICE)
-        print(f"Prix concurrent le plus bas : {market_min} CDF")
-        print(f"Ajustement de votre annonce à : {target_price} CDF")
+        print(f"1er vendeur actuel : {market_min} CDF")
+        print(f"Votre nouveau prix ciblé : {target_price} CDF")
         
-        # Envoi de la mise à jour à Binance
         update_ad_price(target_price)
     else:
-        print("Impossible de récupérer les prix du marché.")
+        print("Impossible d'obtenir les prix du marché.")
 
 if __name__ == "__main__":
     main()
