@@ -35,30 +35,29 @@ def update_ad_price(new_price):
         print("Erreur : Clés manquantes dans Termius !")
         return
 
-    url = "https://api.binance.com/sapi/v1/c2c/ads/update"
+    # Endpoint exact pour les modifications d'annonces P2P
+    url = "https://api.binance.com/sapi/v1/c2c/agent/ads/update"
     timestamp = int(time.time() * 1000)
     
-    # Binance P2P SAPI accepte souvent la valeur du prix sans décimales inutiles si c'est un entier, ou sous forme standard
-    price_str = str(round(new_price, 2))
-
-    params = {
+    # Payload JSON
+    payload = {
         "advNo": ADV_NO,
-        "price": price_str,
-        "recvWindow": 5000,
+        "price": str(round(new_price, 2)),
         "timestamp": timestamp
     }
     
     # Signature
-    query_string = '&'.join([f"{k}={v}" for k, v in sorted(params.items())])
+    query_string = '&'.join([f"{k}={v}" for k, v in sorted(payload.items())])
     signature = hmac.new(SECRET_KEY.encode('utf-8'), query_string.encode('utf-8'), hashlib.sha256).hexdigest()
-    params["signature"] = signature
-
+    
+    final_url = f"{url}?{query_string}&signature={signature}"
     headers = {
-        "X-MBX-APIKEY": API_KEY
+        "X-MBX-APIKEY": API_KEY,
+        "Content-Type": "application/json"
     }
 
     try:
-        response = requests.post(url, headers=headers, params=params)
+        response = requests.post(final_url, headers=headers, json=payload)
         print(f"Code HTTP : {response.status_code}")
         print(f"Réponse Binance : {response.text}")
     except Exception as e:
