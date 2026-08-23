@@ -35,28 +35,30 @@ def update_ad_price(new_price):
         print("Erreur : Clés manquantes dans Termius !")
         return
 
-    # Endpoint d'update C2C officiel
     url = "https://api.binance.com/sapi/v1/c2c/ads/update"
     timestamp = int(time.time() * 1000)
-    formatted_price = f"{new_price:.2f}"
     
-    # Paramètres de la requête
+    # Binance P2P SAPI accepte souvent la valeur du prix sans décimales inutiles si c'est un entier, ou sous forme standard
+    price_str = str(round(new_price, 2))
+
     params = {
         "advNo": ADV_NO,
-        "price": formatted_price,
+        "price": price_str,
+        "recvWindow": 5000,
         "timestamp": timestamp
     }
     
-    # Signature HMAC SHA256
+    # Signature
     query_string = '&'.join([f"{k}={v}" for k, v in sorted(params.items())])
     signature = hmac.new(SECRET_KEY.encode('utf-8'), query_string.encode('utf-8'), hashlib.sha256).hexdigest()
-    
-    # Envoi direct dans les query params (URL)
-    final_url = f"{url}?{query_string}&signature={signature}"
-    headers = {"X-MBX-APIKEY": API_KEY}
+    params["signature"] = signature
+
+    headers = {
+        "X-MBX-APIKEY": API_KEY
+    }
 
     try:
-        response = requests.post(final_url, headers=headers)
+        response = requests.post(url, headers=headers, params=params)
         print(f"Code HTTP : {response.status_code}")
         print(f"Réponse Binance : {response.text}")
     except Exception as e:
@@ -69,7 +71,7 @@ def main():
     if market_min:
         target_price = max(market_min - PRICE_STEP, FLOOR_PRICE)
         print(f"1er vendeur actuel : {market_min} CDF")
-        print(f"Votre nouveau prix ciblé : {target_price:.2f} CDF")
+        print(f"Votre nouveau prix ciblé : {target_price} CDF")
         
         update_ad_price(target_price)
     else:
