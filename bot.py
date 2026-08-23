@@ -35,30 +35,28 @@ def update_ad_price(new_price):
         print("Erreur : Clés manquantes dans Termius !")
         return
 
-    # Endpoint d'update SAPI avec formatage à 2 décimales
+    # Endpoint d'update C2C officiel
     url = "https://api.binance.com/sapi/v1/c2c/ads/update"
     timestamp = int(time.time() * 1000)
     formatted_price = f"{new_price:.2f}"
     
-    # Construction du dictionnaire de paramètres
+    # Paramètres de la requête
     params = {
         "advNo": ADV_NO,
         "price": formatted_price,
         "timestamp": timestamp
     }
     
-    # Signature
+    # Signature HMAC SHA256
     query_string = '&'.join([f"{k}={v}" for k, v in sorted(params.items())])
     signature = hmac.new(SECRET_KEY.encode('utf-8'), query_string.encode('utf-8'), hashlib.sha256).hexdigest()
-    params["signature"] = signature
-
-    headers = {
-        "X-MBX-APIKEY": API_KEY,
-        "Content-Type": "application/x-www-form-urlencoded"
-    }
+    
+    # Envoi direct dans les query params (URL)
+    final_url = f"{url}?{query_string}&signature={signature}"
+    headers = {"X-MBX-APIKEY": API_KEY}
 
     try:
-        response = requests.post(url, headers=headers, data=params)
+        response = requests.post(final_url, headers=headers)
         print(f"Code HTTP : {response.status_code}")
         print(f"Réponse Binance : {response.text}")
     except Exception as e:
